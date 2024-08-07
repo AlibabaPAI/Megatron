@@ -17,7 +17,8 @@ TORCH_PROFILE=0
 TRAIN_ITERS=10000
 SEQ_LEN=2048
 TP_SIZE=1
-PP_SIZE=1   
+PP_SIZE=1
+LOG_INTERVAL=10
 
 # 解析命令行参数
 while [[ "$#" -gt 0 ]]; do
@@ -62,6 +63,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --train-iters)
             TRAIN_ITERS="$2"
+            shift
+            ;;
+        --log-interval)
+            LOG_INTERVAL="$2"
             shift
             ;;
         *)
@@ -175,7 +180,7 @@ EXTRA_ARGS=(
     --use-distributed-optimizer
     --normalization RMSNorm
     --transformer-impl transformer_engine
-    --log-interval 10
+    --log-interval ${LOG_INTERVAL}
 )
 
 if [[ "$TORCH_PROFILE" -eq 1 ]]; then

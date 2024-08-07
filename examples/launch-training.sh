@@ -49,3 +49,24 @@ bash examples/run-megatron.sh --random-init --mbs 2 --gbs 16 --attn-type fused -
 
 bash examples/run-megatron.sh --random-init --mbs 2 --gbs 16 --attn-type unfused --seq-len 8192 --pp 2 --gc --gc-cnt 32
 
+
+## larger batch size
+bash examples/run-megatron.sh --random-init --mbs 2 --gbs 64 --attn-type flash --seq-len 8192 --pp 2 --gc --gc-cnt 9 --log-interval 5
+
+bash examples/run-megatron.sh --random-init --mbs 2 --gbs 128 --attn-type flash --seq-len 8192 --pp 2 --gc --gc-cnt 9 --log-interval 5
+
+bash examples/run-megatron.sh --random-init --mbs 2 --gbs 256 --attn-type flash --seq-len 8192 --pp 2 --gc --gc-cnt 9 --log-interval 5
+
+
+bash examples/run-megatron.sh --random-init --mbs 1 --gbs 64 --attn-type flash --seq-len 8192 --pp 2 --log-interval 5
+
+bash examples/run-megatron.sh --random-init --mbs 1 --gbs 128 --attn-type flash --seq-len 8192 --pp 2 --log-interval 5
+
+bash examples/run-megatron.sh --random-init --mbs 1 --gbs 256 --attn-type flash --seq-len 8192 --pp 2 --log-interval 5
+
+
+
+
+
+
+
