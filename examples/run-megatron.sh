@@ -197,8 +197,8 @@ MODEL_PARALLEL_ARGS=(
 	--pipeline-model-parallel-size ${PP_SIZE}
 )
 EXTRA_ARGS=(
-    --tokenizer-type Llama3Tokenizer
-    --tokenizer-model ../models/llama3-8b/tokenizer.model
+    --tokenizer-type ${TOKENIZER_CLASS}
+    --tokenizer-model ${TOKENIZER_MODEL}
     --exit-on-missing-checkpoint
     --no-load-optim
     --no-load-rng
