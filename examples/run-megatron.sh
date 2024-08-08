@@ -19,11 +19,16 @@ SEQ_LEN=2048
 TP_SIZE=1
 PP_SIZE=1
 LOG_INTERVAL=10
+MODEL_NAME="llama-3-8b"
 
 # 解析命令行参数
 while [[ "$#" -gt 0 ]]; do
     echo "$1" "$2"
     case $1 in
+        --model-name)
+            MODEL_NAME="$2"
+            shift
+            ;;
         --attn-type)
             ATTN_TYPE="$2"
             shift
@@ -99,26 +104,31 @@ else
     exit 1
 fi
 
-LLAMA3_MODEL_ARGS=()
+MODEL_ARGS=()
 # 设置随机初始化参数
 if [[ "$RANDOM_INIT" -eq 1 ]]; then
-    LLAMA3_MODEL_ARGS+=(
-        --num-layers 32 
-        --hidden-size 4096 
-        --num-attention-heads 32 
-        --seq-length ${SEQ_LEN} 
-        --max-position-embeddings 8192
-        --num-query-groups 8
-        --group-query-attention
-        --position-embedding-type rope
-        --use-rotary-position-embeddings
-        --disable-bias-linear
-        --ffn-hidden-size 14336
-        --swiglu
-        --bf16
-    )
+    if [[ "$MODEL_NAME" == "llama-3-8b" ]]; then
+        MODEL_ARGS+=(
+            --num-layers 32 
+            --hidden-size 4096 
+            --num-attention-heads 32 
+            --seq-length ${SEQ_LEN} 
+            --max-position-embeddings 8192
+            --num-query-groups 8
+            --group-query-attention
+            --position-embedding-type rope
+            --use-rotary-position-embeddings
+            --disable-bias-linear
+            --ffn-hidden-size 14336
+            --swiglu
+            --bf16
+        )
+    else
+        echo "Unsupported model name: $MODEL_NAME"
+        exit 1
+    fi
 else
-    LLAMA3_MODEL_ARGS+=(
+    MODEL_ARGS+=(
         --seq-length ${SEQ_LEN}
         --bf16
         --use-checkpoint-args
@@ -202,7 +212,7 @@ mkdir -p ${LOG_DIR}
 
 torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \
     ${DATA_ARGS[@]} \
-    ${LLAMA3_MODEL_ARGS[@]} \
+    ${MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \
     ${EXTRA_ARGS[@]} 2>&1 | tee "$log_filename"

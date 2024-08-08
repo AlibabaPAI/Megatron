@@ -1,4 +1,3 @@
-
 # =========seq_len 2048========
 bash examples/run-megatron.sh --random-init --mbs 2 --gbs 16 --attn-type flash --gc --gc-cnt 10
 
