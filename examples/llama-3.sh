@@ -50,10 +50,3 @@ bash examples/run-megatron.sh --random-init --mbs 1 --gbs 64 --attn-type flash -
 bash examples/run-megatron.sh --random-init --mbs 1 --gbs 128 --attn-type flash --seq-len 8192 --pp 2 --log-interval 5
 
 bash examples/run-megatron.sh --random-init --mbs 1 --gbs 256 --attn-type flash --seq-len 8192 --pp 2 --log-interval 5 ## OPTIMAL
-
-
-
-
-
-
-
