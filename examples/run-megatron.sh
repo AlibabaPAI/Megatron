@@ -21,6 +21,8 @@ PP_SIZE=1
 LOG_INTERVAL=10
 MODEL_NAME="llama-3"
 MODEL_SIZE="8B"
+TOKENIZER_CLASS="Llama3Tokenizer"
+TOKENIZER_MODEL="tokenizer/llama-3/tokenizer.model"
 
 
 # 解析命令行参数
@@ -91,7 +93,14 @@ done
 # 设置环境变量
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-# llama3-8b
+if [[ $MODEL_NAME == "llama-3" ]]; then
+    TOKENIZER_CLASS="Llama3Tokenizer"
+    TOKENIZER_MODEL="tokenizer/${MODEL_NAME}/tokenizer.model"
+else
+    echo "Unknown model name: $MODEL_NAME"
+    exit 1
+fi
+
 if [[ $MODEL_SIZE == "8B" ]]; then
     NUM_LAYERS=32
     HIDDEN_SIZE=4096
@@ -219,7 +228,7 @@ DATA_ARGS=(
 LOG_DIR="logs"
 
 # 生成日志文件名称
-log_filename="${LOG_DIR}/dev_attn-${ATTN_TYPE}_mbs-${MBS}_gbs-${GBS}_gc${GC}_gc_cnt-${GC_CNT}_random_init${RANDOM_INIT}_tp-${TP_SIZE}_pp-${PP_SIZE}.log"
+log_filename="${LOG_DIR}/${MODEL_NAME}-${MODEL_SIZE}_dev_attn-${ATTN_TYPE}_mbs-${MBS}_gbs-${GBS}_gc${GC}_gc_cnt-${GC_CNT}_random_init${RANDOM_INIT}_tp-${TP_SIZE}_pp-${PP_SIZE}.log"
 mkdir -p ${LOG_DIR}
 
 torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \
