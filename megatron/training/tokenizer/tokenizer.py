@@ -567,6 +567,7 @@ def create_llama3_tokenizer(*args, **kwargs):
     class _Llama3Tokenizer(Llama3Tokenizer):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
+            self.unique_identifiers = 1
 
         def instruct_tokenize(self, s: str, bos=True, eos=False):
             '''Default args for text completion, not chat/dialog.'''
