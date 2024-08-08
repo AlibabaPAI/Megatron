@@ -19,7 +19,9 @@ SEQ_LEN=2048
 TP_SIZE=1
 PP_SIZE=1
 LOG_INTERVAL=10
-MODEL_NAME="llama-3-8b"
+MODEL_NAME="llama-3"
+MODEL_SIZE="8B"
+
 
 # 解析命令行参数
 while [[ "$#" -gt 0 ]]; do
@@ -27,6 +29,10 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         --model-name)
             MODEL_NAME="$2"
+            shift
+            ;;
+        --model-size)
+            MODEL_SIZE="$2"
             shift
             ;;
         --attn-type)
@@ -86,6 +92,17 @@ done
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 # llama3-8b
+if [[ $MODEL_SIZE == "8B" ]]; then
+    NUM_LAYERS=32
+    HIDDEN_SIZE=4096
+    NUM_ATTENTION_HEADS=32
+    INTERMEDIATE_SIZE=14336
+    # could add more sizes here
+else
+    echo "Unknown model size: $MODEL_SIZE"
+    exit 1
+fi
+
 
 if [[ "$ATTN_TYPE" == "flash" ]]; then
     export NVTE_FLASH_ATTN=1
@@ -107,32 +124,27 @@ fi
 MODEL_ARGS=()
 # 设置随机初始化参数
 if [[ "$RANDOM_INIT" -eq 1 ]]; then
-    if [[ "$MODEL_NAME" == "llama-3-8b" ]]; then
-        MODEL_ARGS+=(
-            --num-layers 32 
-            --hidden-size 4096 
-            --num-attention-heads 32 
-            --seq-length ${SEQ_LEN} 
-            --max-position-embeddings 8192
-            --num-query-groups 8
-            --group-query-attention
-            --position-embedding-type rope
-            --use-rotary-position-embeddings
-            --disable-bias-linear
-            --ffn-hidden-size 14336
-            --swiglu
-            --bf16
-        )
-    else
-        echo "Unsupported model name: $MODEL_NAME"
-        exit 1
-    fi
+    MODEL_ARGS+=(
+        --num-layers ${NUM_LAYERS}
+        --hidden-size ${HIDDEN_SIZE}
+        --num-attention-heads ${NUM_ATTENTION_HEADS}
+        --seq-length ${SEQ_LEN} 
+        --max-position-embeddings 8192
+        --num-query-groups 8
+        --group-query-attention
+        --position-embedding-type rope
+        --use-rotary-position-embeddings
+        --disable-bias-linear
+        --ffn-hidden-size ${INTERMEDIATE_SIZE}
+        --swiglu
+        --bf16
+    )
 else
     MODEL_ARGS+=(
         --seq-length ${SEQ_LEN}
         --bf16
         --use-checkpoint-args
-        --load ../models/llama3-8b-megatron-tp${TP_SIZE}-bf161
+        --load ../models/${MODEL_NAME}-${MODEL_SIZE}-megatron-tp${TP_SIZE}-bf161
     )
 fi
 
