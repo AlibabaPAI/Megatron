@@ -3,9 +3,11 @@
 set -ex
 
 GPUS_PER_NODE=8
-NUM_NODES=1
-MASTER_ADDR=127.0.0.1
-MASTER_PORT=29500
+[ -z "$RANK" ] && RANK=0
+[ -z "$WORLD_SIZE" ] && WORLD_SIZE=1
+[ -z "$MASTER_ADDR" ] && MASTER_ADDR=127.0.0.1
+[ -z "$MASTER_PORT" ] && MASTER_PORT=29500
+
 
 ATTN_TYPE="flash"
 MBS=2
@@ -107,6 +109,11 @@ if [[ $MODEL_SIZE == "8B" ]]; then
     NUM_ATTENTION_HEADS=32
     INTERMEDIATE_SIZE=14336
     # could add more sizes here
+elif [[ $MODEL_SIZE == "70B" ]]; then
+    NUM_LAYERS=80
+    HIDDEN_SIZE=8192
+    NUM_ATTENTION_HEADS=64
+    INTERMEDIATE_SIZE=28672
 else
     echo "Unknown model size: $MODEL_SIZE"
     exit 1
@@ -159,7 +166,8 @@ fi
 
 DISTRIBUTED_ARGS=(
     --nproc_per_node $GPUS_PER_NODE 
-    --nnodes $NUM_NODES 
+    --node_rank $RANK
+    --nnodes $WORLD_SIZE
     --master_addr $MASTER_ADDR 
     --master_port $MASTER_PORT
 )
@@ -203,7 +211,6 @@ EXTRA_ARGS=(
     --no-load-optim
     --no-load-rng
     --untie-embeddings-and-output-weights
-    --no-position-embedding
     --no-masked-softmax-fusion
     --attention-softmax-in-fp32
     --overlap-grad-reduce
@@ -222,7 +229,7 @@ fi
 
 
 DATA_ARGS=(
-    --data-path ../data/_text_document
+    --data-path ./data/_text_document
 )
 
 LOG_DIR="logs"
