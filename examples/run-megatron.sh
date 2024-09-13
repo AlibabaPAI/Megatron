@@ -3,14 +3,17 @@
 set -ex
 
 GPUS_PER_NODE=8
-NUM_NODES=1
-MASTER_ADDR=127.0.0.1
-MASTER_PORT=29500
+[ -z "$RANK" ] && RANK=0
+[ -z "$WORLD_SIZE" ] && WORLD_SIZE=1
+[ -z "$MASTER_ADDR" ] && MASTER_ADDR=127.0.0.1
+[ -z "$MASTER_PORT" ] && MASTER_PORT=29500
+
 
 ATTN_TYPE="flash"
 MBS=2
 RANDOM_INIT=0
-GC=0
+GC=0 # 采用fullgc
+SELECTIVE_GC=0 # 采用selective gc
 GC_CNT=0
 GBS=16
 TORCH_PROFILE=0
@@ -18,7 +21,9 @@ TRAIN_ITERS=10000
 SEQ_LEN=2048
 TP_SIZE=1
 PP_SIZE=1
-LOG_INTERVAL=10
+VP_SIZE=1
+SP=0 # 是否使用Sequence Parallelism，默认degree为TP_SIZE
+LOG_INTERVAL=3
 MODEL_NAME="llama-3"
 MODEL_SIZE="8B"
 TOKENIZER_CLASS="Llama3Tokenizer"
@@ -57,6 +62,13 @@ while [[ "$#" -gt 0 ]]; do
             PP_SIZE="$2"
             shift
             ;;
+        --vp)
+            VP_SIZE="$2"
+            shift
+            ;;
+        --sp)
+            SP=1
+            ;;
         --gbs)
             GBS="$2"
             shift
@@ -66,6 +78,9 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --gc)
             GC=1
+            ;;
+        --selective-gc)
+            SELECTIVE_GC=1
             ;;
         --gc-cnt)
             GC_CNT="$2"
@@ -90,6 +105,12 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+# selective gc和gc不能同时为1
+if [[ $GC -eq 1 && $SELECTIVE_GC -eq 1 ]]; then
+    echo "Error: selective gc and full gc cannot be both 1"
+    exit 1
+fi
+
 # 设置环境变量
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
@@ -107,6 +128,11 @@ if [[ $MODEL_SIZE == "8B" ]]; then
     NUM_ATTENTION_HEADS=32
     INTERMEDIATE_SIZE=14336
     # could add more sizes here
+elif [[ $MODEL_SIZE == "70B" ]]; then
+    NUM_LAYERS=80
+    HIDDEN_SIZE=8192
+    NUM_ATTENTION_HEADS=64
+    INTERMEDIATE_SIZE=28672
 else
     echo "Unknown model size: $MODEL_SIZE"
     exit 1
@@ -129,6 +155,21 @@ else
     echo "Unknown attention type: $ATTN_TYPE"
     exit 1
 fi
+
+# 如果 num_layers不能整除 vp_size，则报错
+if [[ $((NUM_LAYERS % VP_SIZE)) -ne 0 ]]; then
+    echo "Error: num_layers should be divisible by vp_size"
+    exit 1
+fi
+
+# num layers / pp size 必须整除 vp size
+if [[ $((NUM_LAYERS / PP_SIZE % VP_SIZE)) -ne 0 ]]; then
+    echo "Error: num_layers / pp_size should be divisible by vp_size"
+    exit 1
+fi
+
+
+
 
 MODEL_ARGS=()
 # 设置随机初始化参数
@@ -159,7 +200,8 @@ fi
 
 DISTRIBUTED_ARGS=(
     --nproc_per_node $GPUS_PER_NODE 
-    --nnodes $NUM_NODES 
+    --node_rank $RANK
+    --nnodes $WORLD_SIZE
     --master_addr $MASTER_ADDR 
     --master_port $MASTER_PORT
 )
@@ -178,8 +220,6 @@ TRAINING_ARGS=(
     --lr-warmup-fraction .001
     --lr-decay-iters 100000
     --train-iters ${TRAIN_ITERS}
-    # --recompute-activations
-    # --recompute-method uniform
     
     
 )
@@ -192,6 +232,13 @@ if [[ "$GC" -eq 1 ]]; then
     )
 fi
 
+if [[ "$SELECTIVE_GC" -eq 1 ]]; then
+    TRAINING_ARGS+=(
+        --recompute-activations
+    )
+fi
+
+
 MODEL_PARALLEL_ARGS=(
 	--tensor-model-parallel-size ${TP_SIZE}
 	--pipeline-model-parallel-size ${PP_SIZE}
@@ -203,16 +250,23 @@ EXTRA_ARGS=(
     --no-load-optim
     --no-load-rng
     --untie-embeddings-and-output-weights
-    --no-position-embedding
     --no-masked-softmax-fusion
     --attention-softmax-in-fp32
     --overlap-grad-reduce
     --overlap-param-gather
+    # --tp-comm-overlap
     --use-distributed-optimizer
     --normalization RMSNorm
     --transformer-impl transformer_engine
     --log-interval ${LOG_INTERVAL}
 )
+
+# 如果vp >= 2，则在extra_args里加上vp_size
+if [[ "$VP_SIZE" -ge 2 ]]; then
+    EXTRA_ARGS+=(
+        --num-layers-per-virtual-pipeline-stage ${VP_SIZE}
+    )
+fi
 
 if [[ "$TORCH_PROFILE" -eq 1 ]]; then
     EXTRA_ARGS+=(
@@ -220,9 +274,15 @@ if [[ "$TORCH_PROFILE" -eq 1 ]]; then
     )
 fi
 
+if [[ "$SP" -eq 1 ]]; then
+    EXTRA_ARGS+=(
+        --sequence-parallel
+        # --tp-comm-overlap
+    )
+fi
 
 DATA_ARGS=(
-    --data-path ../data/_text_document
+    --data-path ./data/_text_document
 )
 
 LOG_DIR="logs"
